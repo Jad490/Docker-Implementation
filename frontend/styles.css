@@ -89,7 +89,7 @@ body {
 }
 
 .textarea:disabled {
-    background-color: #f3f4f6;
+    background-color: #f7f3f3;
     cursor: not-allowed;
 }
 
