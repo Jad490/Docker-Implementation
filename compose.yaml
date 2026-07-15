@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: sentiment-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      HF_HOME: "${HF_HOME:-/models/huggingface}"
+      HF_HUB_DISABLE_XET: "1"
+    volumes:
+      - model-cache:/models/huggingface
+    networks:
+      - sentiment-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: sentiment-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    networks:
+      - sentiment-network
+
+networks:
+  sentiment-network:
+    driver: bridge
+
+volumes:
+  model-cache:
