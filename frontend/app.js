@@ -1,4 +1,4 @@
-const { useState } = React;
+const { useEffect, useState } = React;
 
 const SentimentAnalyzer = () => {
     const [text, setText] = useState('');
@@ -6,6 +6,22 @@ const SentimentAnalyzer = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [history, setHistory] = useState([]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        getAnalysisHistory()
+            .then((items) => {
+                if (isMounted) {
+                    setHistory(items);
+                }
+            })
+            .catch((err) => console.error('History loading error:', err));
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const handleAnalyze = async () => {
         setLoading(true);
@@ -15,7 +31,14 @@ const SentimentAnalyzer = () => {
         try {
             const data = await analyzeSentiment(text);
             setResult(data);
-            setHistory(prev => [data, ...prev.slice(0, APP_CONFIG.MAX_HISTORY_ITEMS - 1)]);
+
+            try {
+                const persistedHistory = await getAnalysisHistory();
+                setHistory(persistedHistory);
+            } catch (historyError) {
+                console.error('History refresh error:', historyError);
+                setHistory(prev => [data, ...prev.slice(0, APP_CONFIG.MAX_HISTORY_ITEMS - 1)]);
+            }
         } catch (err) {
             setError(err.message);
             console.error('Analysis error:', err);
@@ -34,8 +57,16 @@ const SentimentAnalyzer = () => {
         setError(null);
     };
 
-    const clearHistory = () => {
-        setHistory([]);
+    const clearHistory = async () => {
+        setError(null);
+
+        try {
+            await clearAnalysisHistory();
+            setHistory([]);
+        } catch (err) {
+            setError(err.message);
+            console.error('History clearing error:', err);
+        }
     };
 
     return (

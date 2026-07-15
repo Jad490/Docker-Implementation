@@ -28,3 +28,25 @@ const analyzeSentiment = async (text) => {
         throw err;
     }
 };
+
+const getAnalysisHistory = async (limit = APP_CONFIG.MAX_HISTORY_ITEMS) => {
+    const response = await fetch(`${API_BASE_URL}/history?limit=${limit}`);
+
+    if (!response.ok) {
+        throw new Error(`Could not load analysis history (${response.status})`);
+    }
+
+    return response.json();
+};
+
+const clearAnalysisHistory = async () => {
+    const response = await fetch(`${API_BASE_URL}/history`, {
+        method: 'DELETE',
+    });
+
+    if (!response.ok) {
+        throw new Error(`Could not clear analysis history (${response.status})`);
+    }
+
+    return response.json();
+};

@@ -1,4 +1,22 @@
 services:
+  database:
+    build:
+      context: ./database
+    container_name: sentiment-database
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-sentiment_db}"
+      POSTGRES_USER: "${POSTGRES_USER:-sentiment_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-sentiment_password}"
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"SELECT to_regclass('public.analysis_history') IS NOT NULL\" | grep -q t"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sentiment-network
+
   backend:
     build:
       context: ./backend
@@ -8,8 +26,16 @@ services:
     environment:
       HF_HOME: "${HF_HOME:-/models/huggingface}"
       HF_HUB_DISABLE_XET: "1"
+      DB_HOST: database
+      DB_PORT: "5432"
+      DB_NAME: "${POSTGRES_DB:-sentiment_db}"
+      DB_USER: "${POSTGRES_USER:-sentiment_user}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD:-sentiment_password}"
     volumes:
       - model-cache:/models/huggingface
+    depends_on:
+      database:
+        condition: service_healthy
     networks:
       - sentiment-network
 
@@ -30,3 +56,4 @@ networks:
 
 volumes:
   model-cache:
+  database-data:

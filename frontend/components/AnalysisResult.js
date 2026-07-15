@@ -14,7 +14,7 @@ const AnalysisResult = ({ history, onClearHistory }) => {
                 ) : (
                     <div className="history-items">
                         {history.map((item, index) => (
-                            <div key={index} className="history-item">
+                            <div key={item.id || index} className="history-item">
                                 <p className="history-text">
                                     "{truncateText(item.text)}"
                                 </p>
