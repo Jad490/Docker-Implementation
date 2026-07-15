@@ -5,6 +5,15 @@ from transformers import DistilBertTokenizer, DistilBertForSequenceClassificatio
 import torch
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import List
+
+from database import (
+    clear_analysis_history,
+    database_is_healthy,
+    get_analysis_history,
+    save_analysis,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +83,10 @@ class SentimentResult(BaseModel):
     sentiment: str
     confidence: float
 
+class AnalysisHistoryItem(SentimentResult):
+    id: int
+    created_at: datetime
+
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -81,7 +94,8 @@ async def root():
         "message": "DistilBERT Sentiment Analysis API",
         "endpoints": {
             "/analyze": "POST - Analyze sentiment of text",
-            "/health": "GET - Health check"
+            "/health": "GET - Health check",
+            "/history": "GET - List recent analyses; DELETE - Clear history"
         },
         "example": {
             "input": {"text": "I love this movie! It's absolutely fantastic."},
@@ -94,7 +108,31 @@ async def health_check():
     """Health check endpoint"""
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    return {"status": "healthy", "device": str(device)}
+    if not database_is_healthy():
+        raise HTTPException(status_code=503, detail="Database not available")
+    return {"status": "healthy", "device": str(device), "database": "connected"}
+
+@app.get("/history", response_model=List[AnalysisHistoryItem])
+async def list_analysis_history(limit: int = 10):
+    """Return the most recent persisted sentiment analyses."""
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
+
+    try:
+        return get_analysis_history(limit)
+    except Exception as error:
+        logger.error(f"Error reading analysis history: {str(error)}")
+        raise HTTPException(status_code=503, detail="Database not available")
+
+@app.delete("/history")
+async def delete_analysis_history():
+    """Delete all persisted sentiment analyses."""
+    try:
+        deleted_count = clear_analysis_history()
+        return {"deleted_count": deleted_count}
+    except Exception as error:
+        logger.error(f"Error clearing analysis history: {str(error)}")
+        raise HTTPException(status_code=503, detail="Database not available")
 
 @app.post("/analyze", response_model=SentimentResult)
 async def analyze_sentiment(input_data: TextInput):
@@ -130,10 +168,13 @@ async def analyze_sentiment(input_data: TextInput):
         predicted_label = labels[predicted_class]
         confidence = torch.max(predictions).item()
 
+        rounded_confidence = round(confidence, 3)
+        save_analysis(input_data.text, predicted_label, rounded_confidence)
+
         return SentimentResult(
             text=input_data.text,
             sentiment=predicted_label,
-            confidence=round(confidence, 3)
+            confidence=rounded_confidence
         )
 
     except Exception as e:
