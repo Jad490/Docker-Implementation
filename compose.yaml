@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - sentiment-network
+      - backend-database-network
 
   backend:
     build:
@@ -37,7 +37,8 @@ services:
       database:
         condition: service_healthy
     networks:
-      - sentiment-network
+      - frontend-backend-network
+      - backend-database-network
 
   frontend:
     build:
@@ -48,10 +49,12 @@ services:
     depends_on:
       - backend
     networks:
-      - sentiment-network
+      - frontend-backend-network
 
 networks:
-  sentiment-network:
+  frontend-backend-network:
+    driver: bridge
+  backend-database-network:
     driver: bridge
 
 volumes:
