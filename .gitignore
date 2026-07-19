@@ -12,6 +12,8 @@ venv/
 env/
 etc/
 .env
+.env.*
+!.env.example
 
 
 # FastAPI / ML Models
