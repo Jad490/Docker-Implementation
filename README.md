@@ -100,6 +100,12 @@ python -m http.server 9000
 # Then open: http://localhost:9000/sentiment-analyzer.html
 ```
 
+### AWS credentials
+
+The ECS deployment uses an IAM task role and the AWS SDK's default credential
+provider chain. Do not put access keys in this repository, the Docker image,
+environment files, or the ECS task definition.
+
 ## 🎯 Usage Examples
 
 ### Quick Testing

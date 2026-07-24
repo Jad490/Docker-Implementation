@@ -31,6 +31,8 @@ services:
       DB_NAME: "${POSTGRES_DB:-sentiment_db}"
       DB_USER: "${POSTGRES_USER:-sentiment_user}"
       DB_PASSWORD: "${POSTGRES_PASSWORD:-sentiment_password}"
+      AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
     volumes:
       - model-cache:/models/huggingface
     depends_on:

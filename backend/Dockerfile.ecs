@@ -1,0 +1,27 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    MODEL_PATH=/opt/sentiment-model \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_DISABLE_XET=1
+
+COPY requirements-ecs.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch==2.6.0 \
+      --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements-ecs.txt
+
+# Download the model while the image is built. The private Fargate task therefore
+# does not need NAT access to Hugging Face when it starts.
+COPY cache_model.py .
+RUN python cache_model.py && rm cache_model.py
+
+COPY webapp ./webapp
+
+EXPOSE 8000
+
+CMD ["python", "webapp/sentiment-api-basic.py"]

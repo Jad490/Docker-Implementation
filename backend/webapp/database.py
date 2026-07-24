@@ -6,6 +6,19 @@ from psycopg.rows import dict_row
 
 logger = logging.getLogger(__name__)
 
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS analysis_history (
+    id BIGSERIAL PRIMARY KEY,
+    text TEXT NOT NULL,
+    sentiment VARCHAR(20) NOT NULL,
+    confidence REAL NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_history_created_at
+    ON analysis_history (created_at DESC);
+"""
+
 
 def get_connection():
     return psycopg.connect(
@@ -16,6 +29,14 @@ def get_connection():
         password=os.getenv("DB_PASSWORD", "sentiment_password"),
         row_factory=dict_row,
     )
+
+
+def ensure_database_schema():
+    """Create the application schema when using a new database such as RDS."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(SCHEMA_SQL)
+    logger.info("Database schema is ready")
 
 
 def save_analysis(text, sentiment, confidence):
