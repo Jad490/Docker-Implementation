@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 import torch
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List
@@ -11,6 +12,7 @@ from typing import List
 from database import (
     clear_analysis_history,
     database_is_healthy,
+    ensure_database_schema,
     get_analysis_history,
     save_analysis,
 )
@@ -37,9 +39,18 @@ async def lifespan(app: FastAPI):
 
         # Load tokenizer and model
         logger.info("Loading DistilBERT model and tokenizer...")
-        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        model_path = os.getenv(
+            "MODEL_PATH",
+            "distilbert-base-uncased-finetuned-sst-2-english",
+        )
+        offline_mode = os.getenv("TRANSFORMERS_OFFLINE", "0") == "1"
+        tokenizer = DistilBertTokenizer.from_pretrained(
+            model_path,
+            local_files_only=offline_mode,
+        )
         model = DistilBertForSequenceClassification.from_pretrained(
-            'distilbert-base-uncased-finetuned-sst-2-english'
+            model_path,
+            local_files_only=offline_mode,
         )
 
         # Move model to GPU if available
@@ -47,15 +58,31 @@ async def lifespan(app: FastAPI):
         model.eval()  # Set to evaluation mode
 
         logger.info("Model loaded successfully!")
+        ensure_database_schema()
+        verify_task_role_access()
 
     except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
+        logger.error(f"Application startup failed: {str(e)}")
         raise e
     
     yield  # App runs here
     
     # Shutdown (cleanup if needed)
     logger.info("Shutting down...")
+
+
+def verify_task_role_access():
+    """Optionally prove that the ECS task role can read one exact S3 object."""
+    bucket = os.getenv("TASK_ROLE_PROBE_BUCKET")
+    key = os.getenv("TASK_ROLE_PROBE_KEY")
+    if not bucket or not key:
+        logger.info("Task role S3 verification is not configured")
+        return
+
+    import boto3
+
+    boto3.client("s3").head_object(Bucket=bucket, Key=key)
+    logger.info("Task role verified by reading s3://%s/%s metadata", bucket, key)
 
 # Initialize FastAPI app with lifespan
 app = FastAPI(
