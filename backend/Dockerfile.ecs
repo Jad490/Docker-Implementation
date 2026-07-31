@@ -5,7 +5,6 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MODEL_PATH=/opt/sentiment-model \
-    TRANSFORMERS_OFFLINE=1 \
     HF_HUB_DISABLE_XET=1
 
 COPY requirements-ecs.txt .
@@ -19,6 +18,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # does not need NAT access to Hugging Face when it starts.
 COPY cache_model.py .
 RUN python cache_model.py && rm cache_model.py
+
+# The model is now stored in the image, so the running Fargate task never needs
+# internet access to Hugging Face.
+ENV TRANSFORMERS_OFFLINE=1
 
 COPY webapp ./webapp
 
