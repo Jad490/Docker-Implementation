@@ -52,3 +52,5 @@ yarn-error.log*
 dist/
 build/
 
+# Old manual CodeBuild source archive
+/deployment-source.zip

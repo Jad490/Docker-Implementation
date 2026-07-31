@@ -9,14 +9,67 @@ Do not record passwords, secret values, account IDs, or access keys in screensho
 | Item | Value |
 |---|---|
 | AWS account alias (not account ID) | `<record>` |
-| Region | `<record>` |
-| Deployment date | `<record>` |
+| Region | US East (N. Virginia), `us-east-1` |
+| Deployment date | July 24, 2026 |
 | IAM administrator | `jad-admin` |
 | VPC | `sentiment-vpc` (`10.0.0.0/16`) |
 | ECS cluster | `sentiment-cluster` |
 | ECS service | `sentiment-service` |
 | RDS instance | `sentiment-postgres` |
+| Private S3 bucket | `sentiment-app-assets-jad-a7k2m9` |
 | Application URL | `<record after deployment>` |
+
+## Progress checkpoint — July 24, 2026
+
+Completed and observed:
+
+- Created `jad-admin`, granted console administrator access, enabled MFA, signed
+  out of root, and continued as the IAM user.
+- Selected `us-east-1` for the application resources.
+- Created the VPC, five subnets, Internet Gateway, three route tables, route
+  associations, and the public route to the Internet Gateway.
+- Created security groups for the ALB, ECS task, RDS, and VPC interface
+  endpoints, using security-group references instead of public database or
+  application rules.
+- Created the private RDS subnet group and a Single-AZ PostgreSQL
+  `db.t4g.micro` instance. PostgreSQL log export produced the CloudWatch log
+  group `/aws/rds/instance/sentiment-postgres/postgresql`.
+- Created the S3 gateway endpoint and configured it for the private application
+  route table.
+- Created the ECS application task role and ECS task execution role. The task
+  role is intended to read one exact S3 verification object. The execution role
+  uses `AmazonECSTaskExecutionRolePolicy` and is intended to read the one RDS
+  Secrets Manager secret.
+- Created `/ecs/sentiment/backend` and `/ecs/sentiment/frontend` CloudWatch log
+  groups with seven-day retention.
+- Created the private S3 bucket and uploaded `deployment-source.zip`, which
+  contains `buildspec.yml` plus the backend and frontend build contexts.
+
+Verify before launching ECS:
+
+- The task-role inline policy resource must be exactly
+  `arn:aws:s3:::sentiment-app-assets-jad-a7k2m9/README.md`, and `README.md`
+  must exist at the bucket root.
+- The execution-role inline policy must reference the exact RDS-managed secret
+  ARN, not `*`.
+- Confirm that all four interface endpoints (`ecr.api`, `ecr.dkr`, `logs`, and
+  `secretsmanager`) and the S3 gateway endpoint show `Available`.
+- Confirm both ECR repositories, `sentiment-backend` and
+  `sentiment-frontend`, exist and use immutable tags.
+- Confirm RDS belongs to `sentiment-vpc`, uses
+  `sentiment-db-subnet-group`, has no public access, and uses only
+  `sentiment-rds-sg`.
+- Change the RDS PostgreSQL CloudWatch log retention from `Never expire` to
+  seven days if that edit has not yet been saved.
+
+Not started yet:
+
+- CodeBuild image build and ECR image push.
+- ALB target group and Application Load Balancer.
+- ECS cluster, task definition, service, and public application test.
+- CloudWatch alarm and final logs/metrics exploration.
+- CloudTrail evidence/trail, cost budget, Route 53/ACM research evidence, and
+  final reproducibility screenshots.
 
 ## Design
 

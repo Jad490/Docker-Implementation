@@ -1,17 +1,47 @@
 version: 0.2
 
+env:
+  shell: bash
+  variables:
+    BACKEND_REPOSITORY: sentiment-backend
+    FRONTEND_REPOSITORY: sentiment-frontend
+    BACKEND_CONTAINER_NAME: sentiment-backend
+    FRONTEND_CONTAINER_NAME: sentiment-frontend
+
 phases:
   pre_build:
     commands:
+      - set -euo pipefail
+      - test -n "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}"
+      - test -n "${CODEBUILD_BUILD_NUMBER:-}"
+      - AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
       - REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - BACKEND_IMAGE_URI="$REGISTRY/$BACKEND_REPOSITORY"
+      - FRONTEND_IMAGE_URI="$REGISTRY/$FRONTEND_REPOSITORY"
+      - COMMIT_SHA="$(printf '%s' "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-12)"
+      - IMAGE_TAG="$COMMIT_SHA-$CODEBUILD_BUILD_NUMBER"
+      - export AWS_ACCOUNT_ID REGISTRY BACKEND_IMAGE_URI FRONTEND_IMAGE_URI IMAGE_TAG
+      - echo "Using image tag $IMAGE_TAG"
       - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
   build:
     commands:
-      - docker build --file backend/Dockerfile.ecs --tag "$BACKEND_REPOSITORY:$IMAGE_TAG" backend
-      - docker tag "$BACKEND_REPOSITORY:$IMAGE_TAG" "$REGISTRY/$BACKEND_REPOSITORY:$IMAGE_TAG"
-      - docker build --file frontend/Dockerfile.ecs --tag "$FRONTEND_REPOSITORY:$IMAGE_TAG" frontend
-      - docker tag "$FRONTEND_REPOSITORY:$IMAGE_TAG" "$REGISTRY/$FRONTEND_REPOSITORY:$IMAGE_TAG"
+      - set -euo pipefail
+      - docker build --file backend/Dockerfile.ecs --tag "$BACKEND_IMAGE_URI:$IMAGE_TAG" backend
+      - docker build --file frontend/Dockerfile.ecs --tag "$FRONTEND_IMAGE_URI:$IMAGE_TAG" frontend
+      - docker run --rm --entrypoint python "$BACKEND_IMAGE_URI:$IMAGE_TAG" -m compileall -q /app/webapp
+      - docker run --rm --entrypoint nginx "$FRONTEND_IMAGE_URI:$IMAGE_TAG" -t
   post_build:
     commands:
-      - docker push "$REGISTRY/$BACKEND_REPOSITORY:$IMAGE_TAG"
-      - docker push "$REGISTRY/$FRONTEND_REPOSITORY:$IMAGE_TAG"
+      - set -euo pipefail
+      - docker push "$BACKEND_IMAGE_URI:$IMAGE_TAG"
+      - docker push "$FRONTEND_IMAGE_URI:$IMAGE_TAG"
+      - >-
+        printf '[{"name":"%s","imageUri":"%s"},{"name":"%s","imageUri":"%s"}]'
+        "$BACKEND_CONTAINER_NAME" "$BACKEND_IMAGE_URI:$IMAGE_TAG"
+        "$FRONTEND_CONTAINER_NAME" "$FRONTEND_IMAGE_URI:$IMAGE_TAG"
+        > imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
+  discard-paths: yes
