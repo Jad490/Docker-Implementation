@@ -5,8 +5,8 @@ env:
   variables:
     BACKEND_REPOSITORY: sentiment-backend
     FRONTEND_REPOSITORY: sentiment-frontend
-    BACKEND_CONTAINER_NAME: sentiment-backend
-    FRONTEND_CONTAINER_NAME: sentiment-frontend
+    BACKEND_CONTAINER_NAME: backend
+    FRONTEND_CONTAINER_NAME: frontend
 
 phases:
   pre_build:
